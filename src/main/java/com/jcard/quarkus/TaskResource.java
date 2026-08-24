@@ -17,8 +17,11 @@ public class TaskResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Task> getTasks() {
-        return taskService.getTasks();
+    public List<TaskResponse> getTasks() {
+        return taskService.getTasks()
+                .stream()
+                .map(TaskResponse::new)
+                .toList();
     }
 
     @GET
@@ -29,23 +32,19 @@ public class TaskResource {
         if (task == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } else {
-            return Response.ok(task).build();
+            return Response.ok(new TaskResponse(task)).build();
         }
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response createTask(@Valid Task task) {
+    public Response createTask(@Valid TaskCreateRequest request) {
 
-        if (task.getId() != null) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
-        }
-
-        Task createdTask = taskService.addTask(task);
+        Task createdTask = taskService.addTask(new Task(request.getTitle(), request.isCompleted()));
 
         return Response.status(Response.Status.CREATED)
-                .entity(createdTask)
+                .entity(new TaskResponse(createdTask))
                 .build();
     }
 
@@ -53,13 +52,15 @@ public class TaskResource {
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response updateTask(@PathParam("id") Long id, @Valid Task updatedTask) {
-        Task task = taskService.updateTask(id, updatedTask);
+    public Response updateTask(@PathParam("id") Long id, @Valid TaskUpdateRequest  request) {
+        Task updatedTask = taskService.updateTask(id,
+                new Task(request.getTitle(), request.isCompleted())
+        );
 
-        if (task == null) {
+        if (updatedTask == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         } else {
-            return Response.ok(task).build();
+            return Response.ok(new TaskResponse(updatedTask)).build();
         }
     }
 
