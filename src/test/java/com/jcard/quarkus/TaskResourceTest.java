@@ -187,4 +187,56 @@ class TaskResourceTest {
                 .statusCode(400);
     }
 
+    @Test
+    void shouldRejectTaskWithoutTitle() {
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+            {
+                "title": "",
+                "completed": false
+            }
+        """)
+                .when()
+                .post("/tasks")
+                .then()
+                .statusCode(400);
+    }
+    @Test
+    void shouldRejectTaskWithBlankTitle() {
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+            {
+                "title": "   ",
+                "completed": false
+            }
+        """)
+                .when()
+                .post("/tasks")
+                .then()
+                .statusCode(400)
+                .body("violations[0].message", equalTo("Title is required"));
+    }
+
+    @Test
+    void shouldRejectUpdateWithoutTitle() {
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+            {
+                "title": "",
+                "completed": false
+            }
+        """)
+                .when()
+                .put("/tasks/1")
+                .then()
+                .statusCode(400)
+                .body("violations[0].message", equalTo("Title is required"));
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.jcard.quarkus;
 
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -35,7 +36,7 @@ public class TaskResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response createTask(Task task) {
+    public Response createTask(@Valid Task task) {
 
         if (task.getId() != null) {
             return Response.status(Response.Status.BAD_REQUEST).build();
@@ -52,7 +53,7 @@ public class TaskResource {
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response updateTask(@PathParam("id") Long id, Task updatedTask) {
+    public Response updateTask(@PathParam("id") Long id, @Valid Task updatedTask) {
         Task task = taskService.updateTask(id, updatedTask);
 
         if (task == null) {
