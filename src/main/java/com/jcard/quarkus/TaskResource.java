@@ -37,6 +37,10 @@ public class TaskResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response createTask(Task task) {
 
+        if (task.getId() != null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+
         Task createdTask = taskService.addTask(task);
 
         return Response.status(Response.Status.CREATED)

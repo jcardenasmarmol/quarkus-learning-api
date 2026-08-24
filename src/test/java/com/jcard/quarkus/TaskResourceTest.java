@@ -141,4 +141,50 @@ class TaskResourceTest {
                 .statusCode(404);
     }
 
+    @Test
+    void shouldReturnNotFoundWhenUpdatingNonExistingTask() {
+        String requestBody = """
+        {
+            "title": "Updated task",
+            "completed": true
+        }
+        """;
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(requestBody)
+                .when()
+                .put("/tasks/{id}", 999L)
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenDeletingNonExistingTask() {
+        given()
+                .when()
+                .delete("/tasks/{id}", 999L)
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void shouldRejectTaskWithProvidedId() {
+        String requestBody = """
+        {
+            "id": 9999,
+            "title": "Generated ID task",
+            "completed": false
+        }
+        """;
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(requestBody)
+                .when()
+                .post("/tasks")
+                .then()
+                .statusCode(400);
+    }
+
 }
