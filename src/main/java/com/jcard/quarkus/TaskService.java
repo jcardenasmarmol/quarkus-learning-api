@@ -15,7 +15,7 @@ public class TaskService {
         return taskRepository.listAll();
     }
 
-    public Task getTaskById(Long id) throws TaskNotFoundException {
+    public Task getTaskById(Long id) {
         Task task = taskRepository.findById(id);
 
         if (task == null) {
@@ -31,7 +31,7 @@ public class TaskService {
     }
 
     @Transactional
-    public Task updateTask(Long id, Task updatedTask) throws TaskNotFoundException {
+    public Task updateTask(Long id, Task updatedTask) {
 
         Task task = taskRepository.findById(id);
 
@@ -46,10 +46,9 @@ public class TaskService {
     }
 
     @Transactional
-    public boolean deleteTask(Long id) throws TaskNotFoundException {
+    public void deleteTask(Long id) {
         boolean deleted = taskRepository.deleteById(id);
 
         if (!deleted) throw new TaskNotFoundException(id);
-        else return true;
     }
 }
