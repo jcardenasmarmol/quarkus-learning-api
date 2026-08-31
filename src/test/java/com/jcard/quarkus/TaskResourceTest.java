@@ -2,10 +2,9 @@ package com.jcard.quarkus;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
-import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import java.util.List;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
@@ -13,34 +12,98 @@ import static org.hamcrest.Matchers.*;
 @QuarkusTest
 class TaskResourceTest {
 
-    @Inject
-    TaskRepository taskRepository;
+    private List<Task> testTasks;
 
-    private Task testTask;
+    private Task createTask(String title, boolean completed) {
+        return given()
+                .contentType(ContentType.JSON)
+                .body(("""
+        {
+            "title": "%s",
+            "completed": %s
+        }
+        """).formatted(title, completed))
+                .when()
+                .post("/tasks")
+                .then()
+                .statusCode(201)
+                .extract()
+                .as(Task.class);
+    }
 
     @BeforeEach
-    @Transactional
     void setUp() {
-        taskRepository.deleteAll();
-        testTask = new Task("Test task", false);
-        taskRepository.persist(testTask);
+        int tasksSize = given()
+                .when()
+                .get("/tasks")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .extract()
+                .jsonPath()
+                .getInt("size()");
+
+
+        for (int i = tasksSize; i < 4; i++) {
+            createTask("Test task", false);
+        }
+
+        testTasks = given()
+                .when()
+                .get("/tasks")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .extract()
+                .jsonPath()
+                .getList(".", Task.class);
     }
 
     @Test
     void shouldGetTasks() {
         given()
-          .when()
+                .when()
                 .get("/tasks")
-          .then()
+                .then()
                 .statusCode(200)
                 .contentType(ContentType.JSON)
-                .body("[0].title", equalTo("Test task"))
-                .body("[0].completed", equalTo(false));
+                .body("size()", greaterThan(0));
+    }
+
+    @Test
+    void shouldGetCompletedTasks() {
+
+        createTask("Test task", true);
+
+        given()
+                .when()
+                .get("/tasks?completed=true")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .body("size()", greaterThan(0))
+                .body("completed", everyItem(equalTo(true)));
+    }
+
+    @Test
+    void shouldGetIncompleteTasks() {
+        createTask("Test task", false);
+
+        given()
+                .when()
+                .get("/tasks?completed=false")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .body("size()", greaterThan(0))
+                .body("completed", everyItem(equalTo(false)));
     }
 
 
     @Test
     void shouldGetTasksById() {
+        Task testTask = testTasks.getFirst();
+
         given()
                 .when()
                 .get("/tasks/{id}", testTask.getId())
@@ -48,60 +111,49 @@ class TaskResourceTest {
                 .statusCode(200)
                 .contentType(ContentType.JSON)
                 .body("id", equalTo(testTask.getId().intValue()))
-                .body("title", equalTo("Test task"))
-                .body("completed", equalTo(false));
+                .body("title", equalTo(testTask.getTitle()))
+                .body("completed", equalTo(testTask.isCompleted()));
     }
 
     @Test
     void shouldReturnNotFoundWhenTaskDoesNotExist() {
+        Long nonExistingId = testTasks.getLast().getId() + 9999L;
+
         given()
                 .when()
-                .get("/tasks/999")
+                .get("/tasks/{id}", nonExistingId)
                 .then()
                 .statusCode(404);
     }
 
     @Test
     void shouldCreateTask() {
-        String requestBody = """
-        {
-            "title": "New task",
-            "completed": false
-        }
-        """;
+        String title = "Created test task";
+        boolean completed = false;
 
-        Integer createdId = given()
-                .contentType(ContentType.JSON)
-                .body(requestBody)
-                .when()
-                .post("/tasks")
-                .then()
-                .statusCode(201)
-                .contentType(ContentType.JSON)
-                .body("id", notNullValue())
-                .body("title", equalTo("New task"))
-                .body("completed", equalTo(false))
-                        .extract()
-                                .path("id");
+        Task createdTask = createTask(title,completed);
 
         given()
                 .when()
-                .get("/tasks/{id}", createdId)
+                .get("/tasks/{id}", createdTask.getId())
                 .then()
                 .statusCode(200)
-                .body("id", equalTo(createdId))
-                .body("title", equalTo("New task"))
-                .body("completed", equalTo(false));
+                .body("id", equalTo(createdTask.getId().intValue()))
+                .body("title", equalTo(createdTask.getTitle()))
+                .body("completed", equalTo(createdTask.isCompleted()));
     }
 
     @Test
     void shouldUpdateTask() {
-        String requestBody = """
+        Task testTask = testTasks.getFirst();
+        String title = "Updated test task";
+        boolean completed = true;
+        String requestBody = ("""
         {
-            "title": "Updated task",
-            "completed": true
+            "title": "%s",
+            "completed": %s
         }
-        """;
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
@@ -112,8 +164,8 @@ class TaskResourceTest {
                 .statusCode(200)
                 .contentType(ContentType.JSON)
                 .body("id", equalTo(testTask.getId().intValue()))
-                .body("title", equalTo("Updated task"))
-                .body("completed", equalTo(true));
+                .body("title", equalTo(title))
+                .body("completed", equalTo(completed));
 
         given()
                 .when()
@@ -122,12 +174,14 @@ class TaskResourceTest {
                 .statusCode(200)
                 .contentType(ContentType.JSON)
                 .body("id", equalTo(testTask.getId().intValue()))
-                .body("title", equalTo("Updated task"))
-                .body("completed", equalTo(true));
+                .body("title", equalTo(title))
+                .body("completed", equalTo(completed));
     }
 
     @Test
     void shouldDeleteTask() {
+        Task testTask = testTasks.getFirst();
+
         given()
                 .when()
                 .delete("/tasks/{id}", testTask.getId())
@@ -143,40 +197,47 @@ class TaskResourceTest {
 
     @Test
     void shouldReturnNotFoundWhenUpdatingNonExistingTask() {
-        String requestBody = """
+        Long nonExistingId = testTasks.getLast().getId() + 9999L;
+        String title = "Updated test task";
+        boolean completed = true;
+        String requestBody = ("""
         {
-            "title": "Updated task",
-            "completed": true
+            "title": "%s",
+            "completed": %s
         }
-        """;
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
                 .body(requestBody)
                 .when()
-                .put("/tasks/{id}", 999L)
+                .put("/tasks/{id}", nonExistingId)
                 .then()
                 .statusCode(404);
     }
 
     @Test
     void shouldReturnNotFoundWhenDeletingNonExistingTask() {
+        Long nonExistingId = testTasks.getLast().getId() + 9999L;
+
         given()
                 .when()
-                .delete("/tasks/{id}", 999L)
+                .delete("/tasks/{id}", nonExistingId)
                 .then()
                 .statusCode(404);
     }
 
     @Test
     void shouldRejectTaskWithProvidedId() {
-        String requestBody = """
+        String title = "Updated test task";
+        boolean completed = false;
+        String requestBody = ("""
         {
-            "id": 9999,
-            "title": "Generated ID task",
-            "completed": false
+            "id": 2,
+            "title": "%s",
+            "completed": %s
         }
-        """;
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
@@ -189,15 +250,18 @@ class TaskResourceTest {
 
     @Test
     void shouldRejectTaskWithoutTitle() {
+        String title = "";
+        boolean completed = false;
+        String requestBody = ("""
+        {
+            "title": "%s",
+            "completed": %s
+        }
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
-                .body("""
-            {
-                "title": "",
-                "completed": false
-            }
-        """)
+                .body(requestBody)
                 .when()
                 .post("/tasks")
                 .then()
@@ -205,15 +269,18 @@ class TaskResourceTest {
     }
     @Test
     void shouldRejectTaskWithBlankTitle() {
+        String title = "     ";
+        boolean completed = false;
+        String requestBody = ("""
+        {
+            "title": "%s",
+            "completed": %s
+        }
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
-                .body("""
-            {
-                "title": "   ",
-                "completed": false
-            }
-        """)
+                .body(requestBody)
                 .when()
                 .post("/tasks")
                 .then()
@@ -223,17 +290,21 @@ class TaskResourceTest {
 
     @Test
     void shouldRejectUpdateWithoutTitle() {
+        Task testTask = testTasks.getFirst();
+        String title = "";
+        boolean completed = true;
+        String requestBody = ("""
+        {
+            "title": "%s",
+            "completed": %s
+        }
+        """).formatted(title, completed);
 
         given()
                 .contentType(ContentType.JSON)
-                .body("""
-            {
-                "title": "",
-                "completed": false
-            }
-        """)
+                .body(requestBody)
                 .when()
-                .put("/tasks/1")
+                .put("/tasks/{id}", testTask.getId())
                 .then()
                 .statusCode(400)
                 .body("violations[0].message", equalTo("Title is required"));

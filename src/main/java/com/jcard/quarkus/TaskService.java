@@ -24,6 +24,10 @@ public class TaskService {
         return task;
     }
 
+    public List<Task> getTasksByCompleted(boolean completed) {
+        return taskRepository.findByCompleted(completed);
+    }
+
     @Transactional
     public Task addTask(Task task) {
         taskRepository.persist(task);

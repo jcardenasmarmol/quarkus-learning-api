@@ -30,8 +30,13 @@ public class TaskResource {
             responseCode = "200",
             description = "Tasks retrieved successfully"
     )
-    public List<TaskResponse> getTasks() {
-        return taskService.getTasks()
+    public List<TaskResponse> getTasks(@QueryParam("completed") Boolean completed) {
+
+        List<Task> tasks = completed == null
+                ? taskService.getTasks()
+                : taskService.getTasksByCompleted(completed);
+
+        return tasks
                 .stream()
                 .map(TaskResponse::new)
                 .toList();
